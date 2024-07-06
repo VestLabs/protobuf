@@ -6,9 +6,11 @@ See Also:
 
 """
 
+from decimal import Decimal
 from io import SEEK_CUR
 from typing import IO
 
+from hexbytes import HexBytes
 from pure_protobuf.helpers.io import read_checked
 from pure_protobuf.interfaces._skip import Skip
 from pure_protobuf.interfaces.read import ReadSingular
@@ -51,3 +53,27 @@ class WriteString(Write[str]):
 
 read_string = ReadString()
 write_string = WriteString()
+
+
+class ReadDecimal(ReadSingular[Decimal]):
+    def __call__(self, io: IO[bytes]) -> Decimal:
+        return Decimal(read_bytes(io).decode("utf-8"))
+
+
+class WriteDecimal(Write[str]):
+    def __call__(self, value: Decimal, io: IO[bytes]) -> None:
+        write_bytes(str(value).encode("utf-8"), io)
+
+
+read_decimal = ReadDecimal()
+write_decimal = WriteDecimal()
+
+
+class ReadHexBytes(ReadSingular[bytes]):
+    def __call__(self, io: IO[bytes]) -> bytes:
+        length = read_unsigned_varint(io)
+        return HexBytes(read_checked(io, length))
+
+
+read_hex_bytes = ReadHexBytes()
+write_hex_bytes = WriteBytes()

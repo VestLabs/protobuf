@@ -1,15 +1,32 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from decimal import Decimal
 from enum import IntEnum
-from typing import TYPE_CHECKING, Any, ByteString, ClassVar, Dict, Generic, Type
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    ByteString,
+    ClassVar,
+    Dict,
+    Generic,
+    NewType,
+    Type,
+)
 from urllib.parse import ParseResult
 
-from typing_extensions import Self
-
+from hexbytes import HexBytes
 from pure_protobuf._accumulators import AccumulateLastOneWins
 from pure_protobuf._mergers import MergeLastOneWins
-from pure_protobuf.annotations import ZigZagInt, double, fixed32, fixed64, sfixed32, sfixed64, uint
+from pure_protobuf.annotations import (
+    ZigZagInt,
+    double,
+    fixed32,
+    fixed64,
+    sfixed32,
+    sfixed64,
+    uint,
+)
 from pure_protobuf.exceptions import UnsupportedAnnotationError
 from pure_protobuf.helpers._dataclasses import KW_ONLY, SLOTS
 from pure_protobuf.helpers.itertools import ReadCallback
@@ -18,7 +35,16 @@ from pure_protobuf.interfaces.accumulate import Accumulate
 from pure_protobuf.interfaces.merge import Merge
 from pure_protobuf.interfaces.read import ReadTyped
 from pure_protobuf.interfaces.write import Write
-from pure_protobuf.io.bytes_ import read_bytes, read_string, write_bytes, write_string
+from pure_protobuf.io.bytes_ import (
+    read_bytes,
+    read_decimal,
+    read_hex_bytes,
+    read_string,
+    write_bytes,
+    write_decimal,
+    write_hex_bytes,
+    write_string,
+)
 from pure_protobuf.io.struct_ import ReadStruct, WriteStruct
 from pure_protobuf.io.url import ReadUrl, WriteUrl
 from pure_protobuf.io.varint import (
@@ -35,6 +61,7 @@ from pure_protobuf.io.varint import (
 )
 from pure_protobuf.io.wire_type import WireType
 from pure_protobuf.io.wrappers import ReadMaybePacked, ReadStrictlyTyped
+from typing_extensions import Self
 
 if TYPE_CHECKING:
     from pure_protobuf.message import BaseMessage
@@ -113,12 +140,44 @@ class RecordDescriptor(Generic[RecordT]):
                 return RecordDescriptor(
                     wire_type=WireType.VARINT,
                     write=WriteEnum[inner_hint](),
-                    read=ReadMaybePacked[inner_hint](ReadEnum(inner_hint), WireType.VARINT),
+                    read=ReadMaybePacked[inner_hint](
+                        ReadEnum(inner_hint), WireType.VARINT
+                    ),
                 )
             if issubclass(inner_hint, BaseMessage):
                 return inner_hint._init_embedded_descriptor()
 
-        raise UnsupportedAnnotationError(f"type annotation `{inner_hint!r}` is not supported")
+            if issubclass(inner_hint, Decimal):
+                return RecordDescriptor(
+                    wire_type=WireType.LEN,
+                    write=write_decimal,
+                    read=ReadStrictlyTyped(ReadCallback(read_decimal), WireType.LEN),
+                )
+
+            if issubclass(inner_hint, HexBytes):
+                return RecordDescriptor(
+                    wire_type=WireType.LEN,
+                    write=write_hex_bytes,
+                    read=ReadStrictlyTyped(ReadCallback(read_hex_bytes), WireType.LEN),
+                )
+
+            if issubclass(inner_hint, str):
+                return RecordDescriptor(
+                    wire_type=WireType.LEN,
+                    write=write_string,
+                    read=ReadStrictlyTyped(ReadCallback(read_string), WireType.LEN),
+                )
+
+        if isinstance(inner_hint, NewType) and inner_hint.__supertype__ is str:
+            return RecordDescriptor(
+                wire_type=WireType.LEN,
+                write=write_string,
+                read=ReadStrictlyTyped(ReadCallback(read_string), WireType.LEN),
+            )
+
+        raise UnsupportedAnnotationError(
+            f"type annotation `{inner_hint!r}` is not supported"
+        )
 
 
 BOOL_DESCRIPTOR: RecordDescriptor[bool] = RecordDescriptor(
@@ -179,7 +238,9 @@ RecordDescriptor.__PREDEFINED__ = {
     int: RecordDescriptor(
         wire_type=WireType.VARINT,
         write=WriteTwosComplimentVarint(),
-        read=ReadMaybePacked[int](ReadCallback(ReadTwosComplimentVarint()), WireType.VARINT),
+        read=ReadMaybePacked[int](
+            ReadCallback(ReadTwosComplimentVarint()), WireType.VARINT
+        ),
     ),
     memoryview: BYTES_DESCRIPTOR,
     ParseResult: URL_DESCRIPTOR,
