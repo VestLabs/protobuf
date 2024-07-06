@@ -1,4 +1,5 @@
-from typing import Generic, Iterable, List, Optional, Type
+from itertools import chain
+from typing import Generic, Iterable, List, Optional, Tuple, Type
 
 from pure_protobuf.interfaces._repr import ReprWithInner
 from pure_protobuf.interfaces._vars import MessageT, RecordT
@@ -15,22 +16,32 @@ class AccumulateLastOneWins(Accumulate[RecordT, RecordT], Generic[RecordT]):
         - https://developers.google.com/protocol-buffers/docs/encoding#last-one-wins
     """
 
-    def __call__(self, accumulator: Optional[RecordT], other: Iterable[RecordT]) -> RecordT:
+    def __call__(
+        self, accumulator: Optional[RecordT], other: Iterable[RecordT]
+    ) -> RecordT:
         for accumulator in other:  # noqa: B007
             pass
         return accumulator
 
 
 class AccumulateAppend(Accumulate[List[RecordT], RecordT]):
+    is_tuple: bool
+
+    def __init__(self, is_tuple: bool) -> None:
+        self.is_tuple = is_tuple
+
     def __call__(
         self,
-        accumulator: Optional[List[RecordT]],
+        accumulator: Optional[List[RecordT] | Tuple[RecordT]],
         other: Iterable[RecordT],
-    ) -> List[RecordT]:
+    ) -> List[RecordT] | Tuple[RecordT]:
         """Append all items from the `other` into the accumulator."""
         if accumulator is None:
-            accumulator = []
-        accumulator.extend(other)
+            accumulator = [] if not self.is_tuple else tuple()
+        if not self.is_tuple:
+            accumulator.extend(other)
+        else:
+            accumulator = tuple(chain(accumulator, other))
         return accumulator
 
 

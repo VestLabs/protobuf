@@ -22,10 +22,17 @@ class Sentinel:  # pragma: no cover
 DEFAULT = Sentinel()
 
 
-def extract_repeated(hint: Any) -> Tuple[Any, TypeGuard[List]]:
+def extract_repeated(hint: Any) -> Tuple[Any, TypeGuard[List | Tuple]]:
     """Extract a possible repeated flag."""
     origin = get_origin(hint)
-    if isinstance(origin, type) and (origin is Iterable or issubclass(origin, list)):
+    if isinstance(origin, type) and (
+        origin is Iterable
+        or issubclass(origin, list)
+        or (
+            issubclass(origin, tuple) and len(get_args(hint)) == 2 and get_args(hint)[1]
+        )
+        is Ellipsis
+    ):
         return get_args(hint)[0], True
     return hint, False
 

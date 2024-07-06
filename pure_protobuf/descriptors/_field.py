@@ -3,10 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Generic, Optional, Type, cast
 
-from typing_extensions import Annotated
-from typing_extensions import get_args as get_type_args
-from typing_extensions import get_origin as get_type_origin
-
 from pure_protobuf._accumulators import AccumulateAppend
 from pure_protobuf._mergers import MergeConcatenate
 from pure_protobuf.annotations import Field
@@ -26,6 +22,9 @@ from pure_protobuf.io.wrappers import (
     WriteRepeated,
     WriteTagged,
 )
+from typing_extensions import Annotated
+from typing_extensions import get_args as get_type_args
+from typing_extensions import get_origin as get_type_origin
 
 if TYPE_CHECKING:
     from pure_protobuf.annotations import OneOf
@@ -87,6 +86,10 @@ class _FieldDescriptor(Generic[FieldT, RecordT]):
 
         # Extract the flags from the hint.
         inner_hint, _ = extract_optional(inner_hint)
+        origin = get_type_origin(inner_hint)
+        is_tuple = isinstance(origin, type) and issubclass(
+            get_type_origin(inner_hint), tuple
+        )
         inner_hint, is_repeated = extract_repeated(inner_hint)
 
         inner: RecordDescriptor[RecordT] = RecordDescriptor._from_inner_type_hint(
@@ -121,7 +124,9 @@ class _FieldDescriptor(Generic[FieldT, RecordT]):
         if is_repeated:
             # Merger should concatenate repeated fields.
             merge = cast(Merge[FieldT], MergeConcatenate[RecordT]())
-            accumulate = cast(Accumulate[FieldT, RecordT], AccumulateAppend[RecordT]())
+            accumulate = cast(
+                Accumulate[FieldT, RecordT], AccumulateAppend[RecordT](is_tuple)
+            )
 
         # And now just build and return the final descriptor.
         return cls(
