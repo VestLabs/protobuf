@@ -1,5 +1,6 @@
 from collections.abc import Iterable
-from typing import Any, List, Tuple, Union
+from collections import deque
+from typing import Any, Deque, List, Tuple, Union
 
 from typing_extensions import TypeGuard, get_args, get_origin
 
@@ -22,16 +23,17 @@ class Sentinel:  # pragma: no cover
 DEFAULT = Sentinel()
 
 
-def extract_repeated(hint: Any) -> Tuple[Any, TypeGuard[List | Tuple]]:
+def extract_repeated(hint: Any) -> Tuple[Any, TypeGuard[Deque | List | Tuple]]:
     """Extract a possible repeated flag."""
     origin = get_origin(hint)
     if isinstance(origin, type) and (
         origin is Iterable
-        or issubclass(origin, list)
+        or issubclass(origin, (list, deque))
         or (
-            issubclass(origin, tuple) and len(get_args(hint)) == 2 and get_args(hint)[1]
+            issubclass(origin, tuple)
+            and len(get_args(hint)) == 2
+            and get_args(hint)[1] is Ellipsis
         )
-        is Ellipsis
     ):
         return get_args(hint)[0], True
     return hint, False
