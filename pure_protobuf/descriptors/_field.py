@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from collections import deque
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Generic, Optional, Type, cast
+from typing import TYPE_CHECKING, Any, Deque, Generic, List, Optional, Tuple, Type, cast
 
 from pure_protobuf._accumulators import AccumulateAppend
 from pure_protobuf._mergers import MergeConcatenate
@@ -87,9 +88,9 @@ class _FieldDescriptor(Generic[FieldT, RecordT]):
         # Extract the flags from the hint.
         inner_hint, _ = extract_optional(inner_hint)
         origin = get_type_origin(inner_hint)
-        is_tuple = isinstance(origin, type) and issubclass(
-            get_type_origin(inner_hint), tuple
-        )
+        accumulator = List
+        if isinstance(origin, type):
+            accumulator = Tuple if issubclass(origin, tuple) else Deque if issubclass(origin, deque) else List
         inner_hint, is_repeated = extract_repeated(inner_hint)
 
         inner: RecordDescriptor[RecordT] = RecordDescriptor._from_inner_type_hint(
@@ -125,7 +126,7 @@ class _FieldDescriptor(Generic[FieldT, RecordT]):
             # Merger should concatenate repeated fields.
             merge = cast(Merge[FieldT], MergeConcatenate[RecordT]())
             accumulate = cast(
-                Accumulate[FieldT, RecordT], AccumulateAppend[RecordT](is_tuple)
+                Accumulate[FieldT, RecordT], AccumulateAppend[RecordT](accumulator)
             )
 
         # And now just build and return the final descriptor.

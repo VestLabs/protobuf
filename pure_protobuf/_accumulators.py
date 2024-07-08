@@ -1,5 +1,6 @@
+from collections import deque
 from itertools import chain
-from typing import Generic, Iterable, List, Optional, Tuple, Type
+from typing import Deque, Generic, Iterable, List, Optional, Tuple, Type
 
 from pure_protobuf.interfaces._repr import ReprWithInner
 from pure_protobuf.interfaces._vars import MessageT, RecordT
@@ -25,20 +26,25 @@ class AccumulateLastOneWins(Accumulate[RecordT, RecordT], Generic[RecordT]):
 
 
 class AccumulateAppend(Accumulate[List[RecordT], RecordT]):
-    is_tuple: bool
+    accumulator: type
 
-    def __init__(self, is_tuple: bool) -> None:
-        self.is_tuple = is_tuple
+    def __init__(self, accumulator: type) -> None:
+        self.accumulator = accumulator
 
     def __call__(
         self,
-        accumulator: Optional[List[RecordT] | Tuple[RecordT]],
+        accumulator: Optional[Deque[RecordT] | List[RecordT] | Tuple[RecordT]],
         other: Iterable[RecordT],
-    ) -> List[RecordT] | Tuple[RecordT]:
+    ) -> Deque[RecordT] | List[RecordT] | Tuple[RecordT]:
         """Append all items from the `other` into the accumulator."""
         if accumulator is None:
-            accumulator = [] if not self.is_tuple else tuple()
-        if not self.is_tuple:
+            if self.accumulator is Deque:
+                accumulator = deque()
+            elif self.accumulator is Tuple:
+                accumulator = tuple()
+            else:
+                accumulator = []
+        if self.accumulator is not Tuple:
             accumulator.extend(other)
         else:
             accumulator = tuple(chain(accumulator, other))
